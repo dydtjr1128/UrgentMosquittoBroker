@@ -325,7 +325,9 @@ struct mosquitto_msg_store{
 
 struct mosquitto_client_msg{
 	struct mosquitto_client_msg *next;
+	
 	struct mosquitto_msg_store *store;
+	
 	time_t timestamp;
 	uint16_t mid;
 	uint8_t qos;
@@ -334,6 +336,7 @@ struct mosquitto_client_msg{
 	enum mosquitto_msg_state state;
 	bool dup;
 	int urgent;
+	struct mosquitto_client_msg *prev;
 };
 
 struct mosquitto__unpwd{

@@ -457,9 +457,11 @@ int db__message_insert(struct mosquitto_db *db, struct mosquitto *context, uint1
 	}
 	if(*last_msg){
 		(*last_msg)->next = msg;
+		msg->prev = *last_msg;/////
 		(*last_msg) = msg;
 	}else{
 		*msgs = msg;
+		msg->prev = NULL;//////
 		*last_msg = msg;
 	}
 	context->msg_count++;
@@ -872,7 +874,7 @@ int db__message_write(struct mosquitto_db *db, struct mosquitto *context)
 
 	tail = context->inflight_msgs;
 	while(tail){
-		//printf("db__messgage_write %d\n",tail->state);
+		printf("db__messgage_write %d\n",tail->state);
 		
 		msg_count++;
 		mid = tail->mid;

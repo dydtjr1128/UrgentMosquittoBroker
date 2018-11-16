@@ -201,6 +201,7 @@ static void db__message_remove(struct mosquitto_db *db, struct mosquitto *contex
 		}
 		db__msg_store_deref(db, &(*msg)->store);
 	}
+
 	if(last){
 		last->next = (*msg)->next;
 		if(!last->next){
@@ -220,6 +221,57 @@ static void db__message_remove(struct mosquitto_db *db, struct mosquitto *contex
 	}
 }
 
+
+static void db__message_remove_ex(struct mosquitto_db *db, struct mosquitto *context, struct mosquitto_client_msg **msg, struct mosquitto_client_msg *last)
+{
+	if(!context || !msg || !(*msg)){
+		return;
+	}
+	
+	if(*msg){
+		
+		if((*msg)->prev){
+			(*msg)->prev->next = (*msg)->next;
+			printf("--------%s\n", (*msg)->prev->store->topic);
+			if((*msg)->next){
+				printf("여기1\n");
+				(*msg)->next->prev = (*msg)->prev;
+			}
+			else{
+				//context->inflight_msgs = (*msg)->next;
+				if(!context->inflight_msgs){
+					context->last_inflight_msg = NULL;
+				}
+			}
+			mosquitto__free(*msg);
+		}
+		else{
+			if(!(*msg)->next){
+				context->inflight_msgs = (*msg)->next;
+				if(!context->inflight_msgs){
+					context->last_inflight_msg = NULL;
+				}
+				mosquitto__free(*msg);
+				*msg = NULL;
+			}
+			else{
+				context->inflight_msgs = (*msg)->next;
+				if(!context->inflight_msgs){
+					context->last_inflight_msg = NULL;
+				}
+				(*msg)->next->prev = NULL;
+				*msg = (*msg)->next;
+				mosquitto__free((*msg)->prev);
+			}
+
+			printf("여기2\n");
+			
+		}
+		
+
+	}
+	
+}
 void send_ur_message(struct mosquitto_db *db,struct Urgent_db *udb) {
 	if (udb->messages) {
 		Min_mosq *temp = udb->messages;
@@ -231,16 +283,15 @@ void send_ur_message(struct mosquitto_db *db,struct Urgent_db *udb) {
 				Subscriptionlist *list = temp->subs;
 				//printf("debug %s\n",list->sub->id);
 				while (list) {
-					//printf("debug %s\n",list->sub->id);
+					printf("debug %s\n",list->sub->id);
 					if(list->umsg){
-						db__message_write_ex(db,list->sub, list->umsg);
-						
-						list->umsg = NULL;
+						db__message_write_ex(db,list->sub, list->umsg);					
 						
 					}
 					Subscriptionlist *sub_temp = list;
-					free(sub_temp);
 					list = list->next;
+					free(sub_temp);
+					
 					
 
 				}
@@ -282,14 +333,15 @@ int db__message_write_ex(struct mosquitto_db *db,struct mosquitto *context, stru
 	qos = tail->qos;
 	payloadlen = tail->store->payloadlen;
 	payload = UHPA_ACCESS_PAYLOAD(tail->store);
-	printf("paylen: %s\n",(char*)payload);
+	//printf("paylen: %s\n",payload);
 
 	switch (tail->state) {
 		case mosq_ms_publish_qos0:
 			rc = send__publish(context, mid, topic, payloadlen, payload, qos, retain, retries);
 			if (!rc) {
 				
-				db__message_remove(db, context, &tail, last);
+				db__message_remove_ex(db, context, &tail, last);
+				printf("tail: %d\n",tail);
 			}
 			else {
 				return rc;
@@ -536,16 +588,18 @@ int db__message_insert_ex(struct mosquitto_db *db, struct mosquitto *context, ui
 	}
 	if (*last_msg) {
 		(*last_msg)->next = msg;
+		msg->prev = *last_msg;/////
 		(*last_msg) = msg;
 	}
 	else {
 		*msgs = msg;
+		msg->prev = NULL;//////
 		*last_msg = msg;
 	}
 	context->msg_count++;
 	context->msg_bytes += msg->store->payloadlen;
 	*umsg = msg;
-	//printf("umsg: %s\n",umsg->store->topic);
+	printf("umsg: %s\n",(*umsg)->store->topic);
 	if (qos > 0) {
 		context->msg_count12++;
 		context->msg_bytes12 += msg->store->payloadlen;
